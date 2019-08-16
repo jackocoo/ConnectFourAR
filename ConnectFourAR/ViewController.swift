@@ -37,6 +37,9 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     var boardZ: Float!
     var gameBoardMat: simd_float4x4!
     
+    var targetFall = SCNVector3Zero
+    var topYCoord: Float!
+    
     var turnCount: Int = 0
     var isBoardSet = false
     
@@ -113,6 +116,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     }
                     modelClone.position = SCNVector3Zero
                     node.addChildNode(modelClone)
+                    self.addFallAnimation(node: node, target: self.targetFall)
                     self.addAnimation(node: node)
                     return
                 }
@@ -131,6 +135,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     }
                     modelClone.position = SCNVector3Zero
                     node.addChildNode(modelClone)
+                    self.addFallAnimation(node: node, target: self.targetFall)
                     self.turnCount += 1
                 }
             }
@@ -178,8 +183,13 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 let newXCoord = self.boardColumnCoords[columnIndex]
                 let newYCoord = self.boardsRowCoords[targetRow]
                 
+                
+                self.targetFall.x = newXCoord
+                self.targetFall.y = newYCoord
+                self.targetFall.z = self.boardZ
+                
                 simMat.columns.3.x = newXCoord
-                simMat.columns.3.y = newYCoord
+                simMat.columns.3.y = self.topYCoord
                 simMat.columns.3.z = self.boardZ ?? 0
                 self.boardContents[columnIndex] = boardContents[columnIndex] + 1
 
@@ -215,6 +225,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 guard let data = try? NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
                     else { fatalError("can't encode anchor") }
                 self.multipeerSession.sendToAllPeers(data)
+                self.sceneView.debugOptions = []
             }
         }
     }
@@ -251,6 +262,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                                    boardCenter - 0.06,
                                    boardCenter - 0.01,
                                    boardCenter + 0.035]
+        self.topYCoord = rowCoords[5]
         return rowCoords
     }
 
@@ -308,6 +320,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         let rotateAndHover = SCNAction.group([rotateOne, hoverSequence])
         let repeatForever = SCNAction.repeatForever(rotateAndHover)
         node.runAction(repeatForever)
+    }
+    
+    func addFallAnimation(node: SCNNode, target: SCNVector3) {
+        let distance = abs(self.topYCoord - target.y)
+        let time = Double(1.6 * distance)
+
+        let fall = SCNAction.move(to: target, duration: time)
+        node.runAction(fall)
     }
     
     //MARK: Multipeer stuff
