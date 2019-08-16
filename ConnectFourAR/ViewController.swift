@@ -9,11 +9,17 @@
 import UIKit
 import SceneKit
 import ARKit
+import MultipeerConnectivity
+
 
 class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
     
+    var multipeerSession: MultipeerSession!
+    var mapProvider: MCPeerID?
+
+
     var redNodeModel: SCNNode!
     var blackNodeModel: SCNNode!
     var gameBoardModel: SCNNode!
@@ -70,8 +76,11 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         let modelCrownBlack = SCNScene(named: "art.scnassets/blackTexturedCrown/blackTexturedCrown.dae")!
         blackCrownNodeModel = modelCrownBlack.rootNode.childNode(withName: blackCrownName, recursively: true)
         
-        //let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
-        //sceneView.addGestureRecognizer(gestureRecognizer)
+        multipeerSession = MultipeerSession(receivedDataHandler: receivedData)
+
+        
+        let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
+        sceneView.addGestureRecognizer(gestureRecognizer)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -79,6 +88,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         let configuration = ARWorldTrackingConfiguration()
         sceneView.session.run(configuration)
+        
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -103,6 +113,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     }
                     modelClone.position = SCNVector3Zero
                     node.addChildNode(modelClone)
+                    self.addAnimation(node: node)
                     return
                 }
                 
@@ -147,6 +158,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        shareSession()
         let location = touches.first!.location(in: sceneView)
         
         if isBoardSet {
@@ -171,7 +183,12 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 simMat.columns.3.z = self.boardZ ?? 0
                 self.boardContents[columnIndex] = boardContents[columnIndex] + 1
 
-                sceneView.session.add(anchor: ARAnchor(transform: simMat))
+                let anchor = ARAnchor(transform: simMat)
+                sceneView.session.add(anchor: anchor)
+                
+                guard let data = try? NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
+                    else { fatalError("can't encode anchor") }
+                self.multipeerSession.sendToAllPeers(data)
                 
                 moveAndUpdateUI(index: columnIndex)
             }
@@ -190,15 +207,15 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 self.boardColumnCoords = createColumnXCoords(from: self.boardX)
                 self.boardsRowCoords = createRowYCoords(from: self.boardY)
                 
-                sceneView.session.add(anchor: ARAnchor(transform: modTransform))
+                let anchor = ARAnchor(transform: modTransform)
+                
+                sceneView.session.add(anchor: anchor)
                 addPlane(on: SCNVector3(self.boardX, self.boardY - 0.08, self.boardZ))
+                
+                guard let data = try? NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
+                    else { fatalError("can't encode anchor") }
+                self.multipeerSession.sendToAllPeers(data)
             }
-        }
-        if boardData.getGameOver() {
-            var crownMat = self.gameBoardMat
-            let yCoord = crownMat?.columns.3.y
-            crownMat?.columns.3.y = yCoord! + 0.2
-            //sceneView.session.add(anchor: ARAnchor(transform: crownMat!))
         }
     }
     
@@ -237,7 +254,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         return rowCoords
     }
 
-    /*
+    
     @objc func tapped(recognizer :UIGestureRecognizer) {
         let touchPosition = recognizer.location(in: sceneView)
         
@@ -249,7 +266,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             }
         }
     }
-    */
     
     func moveAndUpdateUI(index: Int) {
         
@@ -282,5 +298,52 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             return
         }
         print("Winning move --> \(win)")
+    }
+    
+    func addAnimation(node: SCNNode) {
+        let rotateOne = SCNAction.rotateBy(x: 0, y: CGFloat(Float.pi), z: 0, duration: 1.5)
+        let hoverUp = SCNAction.moveBy(x: 0, y: 0.0075, z: 0, duration: 0.75)
+        let hoverDown = SCNAction.moveBy(x: 0, y: -0.0075, z: 0, duration: 0.75)
+        let hoverSequence = SCNAction.sequence([hoverUp, hoverDown])
+        let rotateAndHover = SCNAction.group([rotateOne, hoverSequence])
+        let repeatForever = SCNAction.repeatForever(rotateAndHover)
+        node.runAction(repeatForever)
+    }
+    
+    //MARK: Multipeer stuff
+    func receivedData(_ data: Data, from peer: MCPeerID) {
+        
+        do {
+            if let worldMap = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) {
+                // Run the session with the received world map.
+                let configuration = ARWorldTrackingConfiguration()
+                configuration.planeDetection = .horizontal
+                configuration.initialWorldMap = worldMap
+                sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+                
+                // Remember who provided the map for showing UI feedback.
+                mapProvider = peer
+            }
+            else
+                if let anchor = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARAnchor.self, from: data) {
+                    // Add anchor to the session, ARSCNView delegate adds visible content.
+                    sceneView.session.add(anchor: anchor)
+                }
+                else {
+                    print("unknown data recieved from \(peer)")
+            }
+        } catch {
+            print("can't decode data recieved from \(peer)")
+        }
+    }
+    
+    func shareSession() {
+        sceneView.session.getCurrentWorldMap { worldMap, error in
+            guard let map = worldMap
+                else { print("Error: \(error!.localizedDescription)"); return }
+            guard let data = try? NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
+                else { fatalError("can't encode map") }
+            self.multipeerSession.sendToAllPeers(data)
+        }
     }
 }

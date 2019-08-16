@@ -4,8 +4,8 @@
   <contributor>
    <authoring_tool>SceneKit Collada Exporter v1.0</authoring_tool>
   </contributor>
-  <created>2019-08-16T17:46:06Z</created>
-  <modified>2019-08-16T17:46:06Z</modified>
+  <created>2019-08-16T20:37:13Z</created>
+  <modified>2019-08-16T20:37:13Z</modified>
   <unit meter="1.000000"/>
   <up_axis>Y_UP</up_axis>
  </asset>
@@ -157,7 +157,7 @@
  <library_visual_scenes>
   <visual_scene id="scene13">
    <node id="blackCrown" name="blackCrown">
-    <matrix>0.05 0 0 -0.2840136 0 0.01 0 5.76041 0 0 0.05 -0.7615986 0 0 0 1 </matrix>
+    <matrix>0.04 0 0 -0.2840136 0 0.008 0 5.76041 0 0 0.04 -0.7615986 0 0 0 1 </matrix>
     <instance_geometry url="#Cylinder">
      <bind_material>
       <technique_common>
