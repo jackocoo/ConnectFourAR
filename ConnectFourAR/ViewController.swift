@@ -64,14 +64,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         let modelSceneBlack = SCNScene(named: "art.scnassets/blackPiecePack/blackPiece.dae")!
         blackNodeModel = modelSceneBlack.rootNode.childNode(withName: blackName, recursively: true)
         
-        let modelCrownRed = SCNScene(named: "art.scnassets/redCrown/redCrowndae.dae")!
+        let modelCrownRed = SCNScene(named: "art.scnassets/redTexturedCrown/redTexturedCrown.dae")!
         redCrownNodeModel = modelCrownRed.rootNode.childNode(withName: redCrownName, recursively: true)
         
-        let modelCrownBlack = SCNScene(named: "art.scnassets/blackCrown/blackCrown.dae")!
+        let modelCrownBlack = SCNScene(named: "art.scnassets/blackTexturedCrown/blackTexturedCrown.dae")!
         blackCrownNodeModel = modelCrownBlack.rootNode.childNode(withName: blackCrownName, recursively: true)
         
-        let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
-        sceneView.addGestureRecognizer(gestureRecognizer)
+        //let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
+        //sceneView.addGestureRecognizer(gestureRecognizer)
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -111,7 +111,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     modelClone.position = SCNVector3Zero
                     node.addChildNode(modelClone)
                     self.isBoardSet = true
-                    print("% the board was set")
                     return
                 } else {
                     if self.boardData.getCurrentPlayer() == .red {
@@ -127,14 +126,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         }
     }
     
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
-    }
-*/
     func session(_ session: ARSession, didFailWithError error: Error) {
         // Present an error message to the user
     }
@@ -172,10 +163,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 let targetRow = self.boardContents[columnIndex]
                 if targetRow > 5 {return}
                 
-                print("% local coordinates \(hit.localCoordinates)")
-                print("% world coordinates \(hit.worldCoordinates)")
-                print("% column index \(columnIndex)")
-                
                 let newXCoord = self.boardColumnCoords[columnIndex]
                 let newYCoord = self.boardsRowCoords[targetRow]
                 
@@ -184,7 +171,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 simMat.columns.3.z = self.boardZ ?? 0
                 self.boardContents[columnIndex] = boardContents[columnIndex] + 1
 
-                print("% local coordinates \(hit.localCoordinates)")
                 sceneView.session.add(anchor: ARAnchor(transform: simMat))
                 
                 moveAndUpdateUI(index: columnIndex)
@@ -251,6 +237,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         return rowCoords
     }
 
+    /*
     @objc func tapped(recognizer :UIGestureRecognizer) {
         let touchPosition = recognizer.location(in: sceneView)
         
@@ -262,6 +249,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             }
         }
     }
+    */
     
     func moveAndUpdateUI(index: Int) {
         
